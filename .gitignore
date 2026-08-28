@@ -1,0 +1,8 @@
+# 组件二进制包不进 git（走 GitHub Releases）
+packages/
+
+# 编辑器 / OS 垃圾
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

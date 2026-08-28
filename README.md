@@ -14,15 +14,98 @@ nexself-pc 桌面客户端的**官方组件仓**。
 
 ```
 nexself-components/
-├── README.md
-├── manifest.json                    ← 唯一入口，客户端拉这个文件
-└── (未来) components/
-    └── <id>/                        ← 每个组件的源文件（构建脚本用）
+├── README.md             ← 本文
+├── LICENSE               ← 仓库许可（MIT）
+├── .gitignore
+├── manifest.json         ← 唯一客户端入口，客户端拉这个文件发现组件
+├── scripts/
+│   └── build-component.ps1   ← 打包 + 算 SHA-256 + 输出可粘贴的 manifest 片段
+└── packages/             ← 打包产物 zip（.gitignore 忽略，走 GitHub Releases 分发）
+    └── <id>.zip
 ```
 
 **发布文件通过 GitHub Releases**（不放 git tree，避免仓库膨胀）：
 - Release tag = `<component-id>-vX.Y.Z`（如 `bge-small-zh-v1.5`）
 - Release asset = `<component-id>.zip`（客户端下载的实际文件）
+
+---
+
+## 发布一个新组件的完整流程
+
+假设你要发布主题包 `theme-dark-v1`，源文件在 `F:\...\theme-dark\`（含 `.nexself-component.json` + 各类文件）。
+
+### 1. 用脚本打包
+
+```powershell
+.\scripts\build-component.ps1 -SourceDir "F:\...\theme-dark" -Id "theme-dark-v1"
+```
+
+脚本会：
+- 生成 `packages/theme-dark-v1.zip`
+- 算 SHA-256
+- 打印可直接粘贴进 `manifest.json` 的字段（sizeBytes / sha256 / download URL 模板）
+- 打印上传步骤提示
+
+### 2. 上传到 GitHub Releases
+
+- 打开 https://github.com/visionnie/nexself-components/releases → `Draft a new release`
+- **Tag**: 手动输入 `theme-dark-v1`，选 `Create new tag: theme-dark-v1 on publish`
+- **Title**: 随便（`Theme Dark v1`）
+- **Attach binaries**: 把 `packages/theme-dark-v1.zip` 拖进去（**不改名**，客户端按精确路径拉）
+- 点 `Publish release`
+
+### 3. 更新 manifest.json
+
+复制脚本打印的字段，加进 `manifest.json` 的 `components` 数组：
+
+```json
+{
+  "id": "theme-dark-v1",
+  "kind": "theme",
+  "displayName": "Dark Theme v1",
+  "description": "深色主题，护眼向",
+  "version": "1.0.0",
+  "runtimeMin": "0.12.0",
+  "sizeBytes": ...,       // 脚本填
+  "sha256": "...",         // 脚本填
+  "license": "MIT",
+  "download": { "primary": "...", "mirrors": [] },  // 脚本填
+  "unpack": { "kind": "zip", "layout": [...] },
+  "provides": ["theme.dark"],
+  "default": false
+}
+```
+
+### 4. 提交 manifest
+
+```bash
+git add manifest.json
+git commit -m "feat: publish theme-dark-v1"
+git push
+```
+
+客户端下次点「↻ 同步仓库」就能拉到。
+
+---
+
+## `.nexself-component.json`（组件内嵌描述）
+
+每个组件 zip 里必须带一个 `.nexself-component.json`，客户端解压后据此登记：
+
+```json
+{
+  "id": "theme-dark-v1",
+  "kind": "theme",
+  "displayName": "Dark Theme v1",
+  "version": "1.0.0",
+  "sizeBytes": ...,
+  "provides": ["theme.dark"],
+  "description": "深色主题，护眼向",
+  "license": "MIT"
+}
+```
+
+字段必须与 manifest 里同 id 的条目一致。
 
 ---
 
@@ -50,7 +133,7 @@ nexself-components/
       "unpack": {
         "kind": "zip",
         "layout": [
-          { "path": "解压后应存在的相对路径", "sha256": "(可选) 逐文件校验" }
+          { "path": "解压后应存在的相对路径" }
         ]
       },
       "provides": ["能力标签，客户端按此 resolve"],
@@ -61,42 +144,14 @@ nexself-components/
 }
 ```
 
-### 发布一个新组件的流程
-
-1. 把源文件打成 `<id>.zip`（内含 `.nexself-component.json` 描述）
-2. 算 zip 的 SHA-256（Windows：`certutil -hashfile <id>.zip SHA256`；Linux：`sha256sum`）
-3. 在 GitHub 建 Release，tag = `<id>-v<version>`，上传 zip 作为 asset
-4. 编辑本仓 `manifest.json`：追加 / 更新对应条目，`download.primary` 用 asset 的直链
-5. `git commit && git push` —— 客户端下次点"↻ 同步仓库"就能拉到
-
-### `.nexself-component.json`（组件内嵌描述）
-
-每个组件 zip 里必须带一个 `.nexself-component.json`，客户端解压后据此登记：
-
-```json
-{
-  "id": "bge-small-zh-v1.5",
-  "kind": "embedding",
-  "displayName": "bge-small-zh v1.5",
-  "version": "1.5.0",
-  "sizeBytes": 24010842,
-  "provides": ["embedding.bge-small-zh", "embedding.chinese-default"],
-  "description": "...",
-  "license": "MIT"
-}
-```
-
-字段必须与 manifest 里同 id 的条目一致。
-
 ---
 
 ## 当前已发布组件
 
 | id | kind | 大小 | 用途 |
 |---|---|---|---|
-| `bge-small-zh-v1.5` | embedding | 22.9 MB | AI Engine Memory 语义搜索（内嵌预装，同版本 manifest 条目仅供参考） |
-
-（未来在这里追加，让人一眼看清仓里有什么）
+| `bge-small-zh-v1.5` | embedding | 15.6 MB | AI Engine Memory 语义搜索（内嵌预装，同版本 manifest 条目仅供参考） |
+| `bge-small-zh-test-v1.5` | embedding | 15.6 MB | 开发测试用，走通装卸流程；正式版可删 |
 
 ---
 
