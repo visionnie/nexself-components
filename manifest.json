@@ -1,0 +1,35 @@
+{
+  "schema": "nexself-components-v1",
+  "publishedAt": "2026-08-27T00:00:00Z",
+  "components": [
+    {
+      "id": "bge-small-zh-v1.5",
+      "kind": "embedding",
+      "displayName": "bge-small-zh v1.5",
+      "description": "中文 512 维 embedding INT8 量化模型，AI Engine Memory 语义搜索默认引擎",
+      "version": "1.5.0",
+      "runtimeMin": "0.12.0",
+      "sizeBytes": 24010842,
+      "sha256": "TBD-fill-after-first-real-package",
+      "license": "MIT",
+      "download": {
+        "primary": "https://github.com/visionnie/nexself-components/releases/download/bge-small-zh-v1.5/bge-small-zh-v1.5.zip",
+        "mirrors": []
+      },
+      "unpack": {
+        "kind": "zip",
+        "layout": [
+          { "path": "model_quantized.onnx" },
+          { "path": "tokenizer.json" },
+          { "path": "config.json" },
+          { "path": "tokenizer_config.json" },
+          { "path": "special_tokens_map.json" },
+          { "path": ".nexself-component.json" }
+        ]
+      },
+      "provides": ["embedding.bge-small-zh", "embedding.chinese-default"],
+      "recommendedFor": ["ai-engine.memory.semantic-search"],
+      "default": true
+    }
+  ]
+}
