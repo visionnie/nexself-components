@@ -29,37 +29,8 @@
       },
       "provides": ["embedding.bge-small-zh", "embedding.chinese-default"],
       "recommendedFor": ["ai-engine.memory.semantic-search"],
-      "changelog": "首个稳定版本\n· 中文 512 维向量表征\n· INT8 量化,推理速度 <100ms\n· 支持 CPU 推理无需 GPU\n· L2 归一化输出,点积即余弦相似度",
+      "changelog": "首个稳定版本\n· 中文 512 维向量表征\n· INT8 量化，推理速度 <100ms\n· 支持 CPU 推理无需 GPU\n· L2 归一化输出，点积即余弦相似度",
       "default": true
-    },
-    {
-      "id": "bge-small-zh-test-v1.5",
-      "kind": "embedding",
-      "displayName": "bge-small-zh v1.5 (装卸测试)",
-      "description": "开发测试用 · 走通「同步 → 安装 → 卸载」完整流程；文件跟 bge-small-zh-v1.5 完全一样，只是 id 不同以便测试装卸。发版时可删除本条。",
-      "version": "1.5.0",
-      "runtimeMin": "0.12.0",
-      "sizeBytes": 16382414,
-      "sha256": "01d38e84dc339211fa82bcd9f9079445065c02d31e7ce25d0353c5fcb05602ec",
-      "license": "MIT",
-      "download": {
-        "primary": "https://github.com/visionnie/nexself-components/releases/download/bge-small-zh-v1.5/bge-small-zh-v1.5.zip",
-        "mirrors": []
-      },
-      "unpack": {
-        "kind": "zip",
-        "layout": [
-          { "path": "model_quantized.onnx" },
-          { "path": "tokenizer.json" },
-          { "path": "config.json" },
-          { "path": "tokenizer_config.json" },
-          { "path": "special_tokens_map.json" },
-          { "path": ".nexself-component.json" }
-        ]
-      },
-      "provides": ["test.bge-small-zh-copy"],
-      "changelog": "开发测试组件,专用于走通装/卸/升级完整流程",
-      "default": false
     }
   ]
 }
