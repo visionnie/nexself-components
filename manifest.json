@@ -29,6 +29,7 @@
       },
       "provides": ["embedding.bge-small-zh", "embedding.chinese-default"],
       "recommendedFor": ["ai-engine.memory.semantic-search"],
+      "changelog": "首个稳定版本\n· 中文 512 维向量表征\n· INT8 量化,推理速度 <100ms\n· 支持 CPU 推理无需 GPU\n· L2 归一化输出,点积即余弦相似度",
       "default": true
     },
     {
@@ -57,6 +58,7 @@
         ]
       },
       "provides": ["test.bge-small-zh-copy"],
+      "changelog": "开发测试组件,专用于走通装/卸/升级完整流程",
       "default": false
     }
   ]
