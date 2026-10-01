@@ -1,0 +1,173 @@
+# 放到组件仓 nexself-components 的 .github/workflows/update-manifest.yml
+#
+# 作用：发布 Release 时自动重算 manifest.json 并提交回 main。
+# 发组件从此只有一步 —— 传 Release，别的不用管。
+#
+# 为什么是「合并」而不是「全量重建」：
+#   manifest 里有一批 zip 里**没有**的人工字段（runtimeMin / recommendedFor / default / changelog），
+#   全量重建会把它们抹掉。所以机械字段（version / sizeBytes / sha256 / download / unpack）按包里的
+#   实际内容覆盖，人工字段保留原值。
+#
+# 组件 zip 的硬要求（客户端 api/components.rs 校验）：
+#   1. 必须含 .nexself-component.json（id / kind / displayName / version / provides / description / license）
+#   2. 必须平铺，不能有子目录
+#   任何一条不满足，这个工作流会直接失败并在日志里点名，而不是生成一份装不上的 manifest。
+
+name: 更新 manifest.json
+
+on:
+  release:
+    types: [published, edited]
+  workflow_dispatch: # 手动跑一次，用于修完历史数据后重新对齐
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-manifest
+  cancel-in-progress: false
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: 扫描所有 Release，重算 manifest.json
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          mkdir -p .tmp-assets
+          node - <<'NODE'
+          const { execFileSync } = require("node:child_process");
+          const fs = require("node:fs");
+          const path = require("node:path");
+
+          const repo = process.env.REPO;
+          const sh = (cmd, args) =>
+            execFileSync(cmd, args, { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 });
+
+          // ── 读现有 manifest，保留人工字段 ──
+          const MANIFEST = "manifest.json";
+          let manifest = { schema: "nexself-components-v1", components: [] };
+          if (fs.existsSync(MANIFEST)) {
+            manifest = JSON.parse(fs.readFileSync(MANIFEST, "utf8"));
+          }
+          const existing = new Map((manifest.components ?? []).map((c) => [c.id, c]));
+
+          // ── 列出所有正式 Release（草稿不算；预发布也跳过，免得把测试包推给所有人）──
+          const releases = JSON.parse(
+            sh("gh", ["release", "list", "--repo", repo, "--limit", "200",
+                      "--json", "tagName,isDraft,isPrerelease,publishedAt"])
+          )
+            .filter((r) => !r.isDraft && !r.isPrerelease)
+            .sort((a, b) => new Date(a.publishedAt) - new Date(b.publishedAt)); // 旧→新，新的覆盖旧的
+
+          const problems = [];
+          const built = new Map();
+
+          for (const rel of releases) {
+            const detail = JSON.parse(
+              sh("gh", ["release", "view", rel.tagName, "--repo", repo, "--json", "body,assets"])
+            );
+            const zips = (detail.assets ?? []).filter((a) => a.name.endsWith(".zip"));
+            if (zips.length === 0) continue;
+
+            for (const asset of zips) {
+              const dir = fs.mkdtempSync(path.join(".tmp-assets", "a-"));
+              const local = path.join(dir, asset.name);
+              sh("gh", ["release", "download", rel.tagName, "--repo", repo,
+                        "--pattern", asset.name, "--dir", dir, "--clobber"]);
+
+              // zip 结构：必须平铺 + 必须有描述文件
+              const entries = sh("unzip", ["-Z1", local]).split("\n").map((s) => s.trim()).filter(Boolean);
+              const nested = entries.filter((e) => e.includes("/"));
+              if (nested.length > 0) {
+                problems.push(`${rel.tagName}/${asset.name}: zip 里有子目录（${nested[0]} …），客户端只认平铺结构`);
+                continue;
+              }
+              if (!entries.includes(".nexself-component.json")) {
+                problems.push(`${rel.tagName}/${asset.name}: 缺 .nexself-component.json，客户端会判定「打包不合规」`);
+                continue;
+              }
+
+              let desc;
+              try {
+                desc = JSON.parse(sh("unzip", ["-p", local, ".nexself-component.json"]));
+              } catch (e) {
+                problems.push(`${rel.tagName}/${asset.name}: .nexself-component.json 解析失败（检查是不是存成了带 BOM 的 UTF-8）`);
+                continue;
+              }
+              for (const field of ["id", "kind", "displayName", "version"]) {
+                if (!desc[field]) problems.push(`${rel.tagName}/${asset.name}: .nexself-component.json 缺字段 ${field}`);
+              }
+              if (!desc.id) continue;
+
+              const sizeBytes = fs.statSync(local).size;
+              const sha256 = sh("sha256sum", [local]).split(/\s+/)[0];
+              const prev = existing.get(desc.id) ?? {};
+
+              built.set(desc.id, {
+                id: desc.id,
+                kind: desc.kind,
+                displayName: desc.displayName,
+                description: desc.description ?? prev.description ?? "",
+                version: desc.version,
+                // 以下三个 zip 里没有，沿用 manifest 里已有的人工值
+                ...(prev.runtimeMin ? { runtimeMin: prev.runtimeMin } : {}),
+                sizeBytes,
+                sha256,
+                license: desc.license ?? prev.license ?? "",
+                download: {
+                  primary: asset.url ?? `https://github.com/${repo}/releases/download/${rel.tagName}/${asset.name}`,
+                  mirrors: prev.download?.mirrors ?? [],
+                },
+                unpack: { kind: "zip", layout: entries.map((p) => ({ path: p })) },
+                provides: desc.provides ?? prev.provides ?? [],
+                ...(prev.recommendedFor ? { recommendedFor: prev.recommendedFor } : {}),
+                // Release 正文当 changelog；正文空着就沿用旧的，别把已有的说明冲掉
+                changelog: (detail.body ?? "").trim() || prev.changelog || "",
+                ...(prev.default !== undefined ? { default: prev.default } : {}),
+              });
+            }
+          }
+
+          if (problems.length > 0) {
+            console.error("❌ 有组件包不合规，没有改动 manifest.json：");
+            for (const p of problems) console.error("   · " + p);
+            process.exit(1);
+          }
+          if (built.size === 0) {
+            console.log("没有可用的组件 zip，跳过");
+            process.exit(0);
+          }
+
+          // 已经不在任何 Release 里的组件保留下来（手工加的、或资产被临时删掉的，不要静默消失）
+          for (const [id, c] of existing) if (!built.has(id)) built.set(id, c);
+
+          manifest.schema = "nexself-components-v1";
+          manifest.publishedAt = new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+          manifest.components = [...built.values()].sort((a, b) => a.id.localeCompare(b.id));
+
+          fs.writeFileSync(MANIFEST, JSON.stringify(manifest, null, 2) + "\n", "utf8");
+          console.log(`✅ manifest.json 已更新：${manifest.components.length} 个组件`);
+          for (const c of manifest.components) console.log(`   · ${c.id} v${c.version} (${c.sizeBytes} B)`);
+          NODE
+          rm -rf .tmp-assets
+
+      - name: 有变化才提交
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- manifest.json; then
+            echo "manifest.json 没有变化，不提交"
+            exit 0
+          fi
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add manifest.json
+          git commit -m "chore: 自动更新 manifest.json（${{ github.event.release.tag_name || 'manual' }}）"
+          git push
