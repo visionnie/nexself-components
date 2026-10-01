@@ -1,6 +1,6 @@
 {
   "schema": "nexself-components-v1",
-  "publishedAt": "2026-08-28T00:00:00Z",
+  "publishedAt": "2026-10-01T09:35:52Z",
   "components": [
     {
       "id": "bge-small-zh-v1.5",
@@ -19,18 +19,70 @@
       "unpack": {
         "kind": "zip",
         "layout": [
-          { "path": "model_quantized.onnx" },
-          { "path": "tokenizer.json" },
-          { "path": "config.json" },
-          { "path": "tokenizer_config.json" },
-          { "path": "special_tokens_map.json" },
-          { "path": ".nexself-component.json" }
+          {
+            "path": ".nexself-component.json"
+          },
+          {
+            "path": "config.json"
+          },
+          {
+            "path": "model_quantized.onnx"
+          },
+          {
+            "path": "special_tokens_map.json"
+          },
+          {
+            "path": "tokenizer.json"
+          },
+          {
+            "path": "tokenizer_config.json"
+          }
         ]
       },
-      "provides": ["embedding.bge-small-zh", "embedding.chinese-default"],
-      "recommendedFor": ["ai-engine.memory.semantic-search"],
+      "provides": [
+        "embedding.bge-small-zh",
+        "embedding.chinese-default"
+      ],
+      "recommendedFor": [
+        "ai-engine.memory.semantic-search"
+      ],
       "changelog": "首个稳定版本\n· 中文 512 维向量表征\n· INT8 量化，推理速度 <100ms\n· 支持 CPU 推理无需 GPU\n· L2 归一化输出，点积即余弦相似度",
       "default": true
+    },
+    {
+      "id": "frpc-windows-x64",
+      "kind": "tunnel",
+      "displayName": "frpc 内网穿透",
+      "description": "开启公网访问后，人在外面也能用手机连回这台电脑。只连你自己填的服务器地址；不开公网访问就不会运行。",
+      "version": "0.61.0",
+      "sizeBytes": 5801549,
+      "sha256": "aa55372363e1142c2a5bcdcdaaaf80e6873432a18dd0e3cf13ff610f3b4f278f",
+      "license": "Apache-2.0",
+      "download": {
+        "primary": "https://github.com/visionnie/nexself-components/releases/download/frpc-windows-x64-0.61.0/frpc-windows-x64-0.61.0.zip",
+        "mirrors": []
+      },
+      "unpack": {
+        "kind": "zip",
+        "layout": [
+          {
+            "path": ".nexself-component.json"
+          },
+          {
+            "path": "frpc.exe"
+          },
+          {
+            "path": "LICENSE"
+          },
+          {
+            "path": "SOURCE.txt"
+          }
+        ]
+      },
+      "provides": [
+        "frpc"
+      ],
+      "changelog": ""
     }
   ]
 }
